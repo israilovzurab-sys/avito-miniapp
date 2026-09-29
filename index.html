@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Новая вещь</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-bg-color, #ffffff);
+    --text: var(--tg-theme-text-color, #1c1c1e);
+    --hint: var(--tg-theme-hint-color, #8e8e93);
+    --link: var(--tg-theme-link-color, #007aff);
+    --button: var(--tg-theme-button-color, #007aff);
+    --button-text: var(--tg-theme-button-text-color, #ffffff);
+    --secondary-bg: var(--tg-theme-secondary-bg-color, #f2f2f7);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+         background: var(--bg); color: var(--text); font: 16px/1.4 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  h1 { font-size: 19px; margin: 4px 0 14px; }
+  .switch { display: flex; background: var(--secondary-bg); border-radius: 10px; padding: 3px; margin-bottom: 18px; }
+  .switch button { flex: 1; padding: 9px 6px; border: none; border-radius: 8px; background: transparent; color: var(--text);
+                    font-size: 14px; font-weight: 600; cursor: pointer; }
+  .switch button.active { background: var(--button); color: var(--button-text); }
+  fieldset { border: none; margin: 0 0 18px; padding: 0; }
+  legend { font-size: 13px; color: var(--hint); text-transform: uppercase; letter-spacing: .03em; margin-bottom: 8px; padding: 0; }
+  .measures img { width: 100%; border-radius: 12px; display: block; margin-bottom: 10px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .field label { display: block; font-size: 13px; color: var(--hint); margin-bottom: 4px; }
+  .field { display: flex; align-items: center; background: var(--secondary-bg); border-radius: 10px; padding: 0 4px 0 12px; }
+  .field .letter { font-weight: 700; color: var(--link); margin-right: 8px; }
+  input[type="number"], textarea { border: none; background: transparent; color: var(--text); font-size: 16px;
+                                    padding: 11px 0; width: 100%; font-family: inherit; }
+  input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { margin: 0; }
+  textarea { background: var(--secondary-bg); border-radius: 10px; padding: 11px 12px; resize: vertical; min-height: 70px; }
+  .hint { font-size: 13px; color: var(--hint); margin-top: 6px; }
+  #done { display: none; text-align: center; padding: 40px 10px; }
+  #done .check { font-size: 44px; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+
+<div id="form">
+  <h1>Новая вещь</h1>
+
+  <div class="switch" role="tablist">
+    <button type="button" id="tab-clothes" class="active">👕 Одежда</button>
+    <button type="button" id="tab-other">📦 Другой товар</button>
+  </div>
+
+  <div id="clothes-block">
+    <fieldset class="measures">
+      <legend>Замеры — см. схему, впишите см</legend>
+      <img src="measure-sheet.png" alt="Схема замеров: буквы A, B, C, D">
+      <div class="grid">
+        <div class="field"><span class="letter">A</span><input type="number" inputmode="decimal" id="m-a" placeholder="см"></div>
+        <div class="field"><span class="letter">B</span><input type="number" inputmode="decimal" id="m-b" placeholder="см"></div>
+        <div class="field"><span class="letter">C</span><input type="number" inputmode="decimal" id="m-c" placeholder="см"></div>
+        <div class="field"><span class="letter">D</span><input type="number" inputmode="decimal" id="m-d" placeholder="см"></div>
+      </div>
+      <div class="hint">Заполните только те буквы, что размечены у вашей вещи.</div>
+    </fieldset>
+  </div>
+
+  <fieldset>
+    <legend>Комментарий (не обязательно)</legend>
+    <textarea id="comment" placeholder="Например: бренд, если знаете; есть маленькое пятно на рукаве; торг уместен"></textarea>
+  </fieldset>
+</div>
+
+<div id="done">
+  <div class="check">✅</div>
+  <div>Готово! Теперь пришлите в этот чат 2–4 фото вещи.</div>
+</div>
+
+<script>
+(function () {
+  var tg = window.Telegram && window.Telegram.WebApp;
+  if (tg) { tg.ready(); tg.expand(); }
+
+  var kind = "clothes";
+  var tabClothes = document.getElementById("tab-clothes");
+  var tabOther = document.getElementById("tab-other");
+  var clothesBlock = document.getElementById("clothes-block");
+
+  function setKind(k) {
+    kind = k;
+    tabClothes.classList.toggle("active", k === "clothes");
+    tabOther.classList.toggle("active", k === "other");
+    clothesBlock.style.display = k === "clothes" ? "" : "none";
+  }
+  tabClothes.addEventListener("click", function () { setKind("clothes"); });
+  tabOther.addEventListener("click", function () { setKind("other"); });
+
+  function num(id) {
+    var v = document.getElementById(id).value.trim();
+    return v === "" ? null : Number(v.replace(",", "."));
+  }
+
+  function submit() {
+    var payload = { kind: kind, comment: document.getElementById("comment").value.trim() };
+    if (kind === "clothes") {
+      var m = { A: num("m-a"), B: num("m-b"), C: num("m-c"), D: num("m-d") };
+      Object.keys(m).forEach(function (k) { if (m[k] === null) delete m[k]; });
+      payload.measurements = m;
+    }
+    var json = JSON.stringify(payload);
+    document.getElementById("form").style.display = "none";
+    document.getElementById("done").style.display = "block";
+    if (tg && tg.sendData) {
+      tg.sendData(json);
+      setTimeout(function () { tg.close(); }, 1600);
+    } else {
+      console.log("Telegram WebApp недоступен, данные:", json); // открыто не из Telegram — для отладки в браузере
+    }
+  }
+
+  if (tg && tg.MainButton) {
+    tg.MainButton.setText("Готово");
+    tg.MainButton.show();
+    tg.MainButton.onClick(submit);
+  } else {
+    var btn = document.createElement("button");
+    btn.textContent = "Готово";
+    btn.style.cssText = "width:100%;padding:14px;border:none;border-radius:10px;background:var(--button);color:var(--button-text);font-size:16px;font-weight:600;margin-top:4px";
+    btn.addEventListener("click", submit);
+    document.getElementById("form").appendChild(btn);
+  }
+})();
+</script>
+</body>
+</html>
